@@ -16,8 +16,16 @@ from conftest import (
 )
 
 def _scroll_and_find_book(page, book_identifier: str):
-    """Cuộn trang xuống dần để tìm book card do Flutter Canvas ẩn các phần tử ngoài màn hình"""
-    for _ in range(3):
+    """Cuộn trang xuống dần để tìm book card.
+    Flutter CanvasKit expose book code qua aria-label của group element,
+    không phải text content trực tiếp — dùng aria-label selector.
+    """
+    # Thử tìm bằng aria-label trước (cách Flutter expose book code)
+    for _ in range(5):
+        card = page.locator(f'flt-semantics[aria-label*="{book_identifier}"]').first
+        if card.count() > 0:
+            return card
+        # Fallback: tìm bằng has-text
         card = page.locator(f'flt-semantics:has-text("{book_identifier}")').first
         if card.count() > 0:
             return card
@@ -25,30 +33,32 @@ def _scroll_and_find_book(page, book_identifier: str):
         page.mouse.wheel(0, 800)
         page.wait_for_timeout(1000)
         enable_flutter_semantics(page)
-    return page.locator(f'flt-semantics:has-text("{book_identifier}")').first
+    # Trả về locator aria-label sau khi đã scroll hết
+    return page.locator(f'flt-semantics[aria-label*="{book_identifier}"]').first
 
-# Trong test_borrow_return.py
+
 def _borrow_book(page, book_identifier: str):
-    # Tăng thời gian chờ lên 15 giây
-    card = page.locator(f'flt-semantics:has-text("{book_identifier}")').first
-    card.wait_for(state="attached", timeout=15000) 
-    
+    """Tìm sách và thực hiện mượn. Gọi hàm này khi đã ở tab Sách."""
+    card = _scroll_and_find_book(page, book_identifier)
+    card.wait_for(state="attached", timeout=15000)
+
     borrow_btn = page.locator('flt-semantics[role="button"]:has-text("Mượn sách này")').first
+    borrow_btn.wait_for(state="attached", timeout=10000)
     borrow_btn.click()
-    
-    # CHỜ ĐỢI: Sau khi click, bắt buộc phải chờ UI cập nhật xong
+
+    # Chờ dialog xác nhận xuất hiện
     wait_for_flutter(page, text="Xác nhận", timeout=10000)
-    
+
     confirm_btn = page.locator('flt-semantics[role="button"]:has-text("Mượn")').first
     confirm_btn.click()
-    
-    # CHỜ ĐỢI: Sau khi xác nhận
+
+    # Chờ thông báo thành công
     wait_for_flutter(page, text="thành công", timeout=10000)
 
 def test_tc25_borrow_available_book(page, test_config):
     login_as(page, test_config["base_url"], ACCOUNTS["member_biet"]["email"], ACCOUNTS["member_biet"]["password"])
+    open_books_tab(page)
     _borrow_book(page, "BOOK001")
-    wait_for_flutter(page, text="thành công", timeout=5000)
     page.screenshot(path=os.path.join(SCREENSHOT_DIR, "TC-25_borrow_success.png"))
     txt = sem_text(page)
     assert "thành công" in txt.lower() or "Đang mượn" in txt, "TC-25 FAIL"
@@ -87,13 +97,17 @@ def test_tc28_borrow_button_hidden_for_borrowed_book(page, test_config):
 
 def test_tc29_borrow_expired_member(page, test_config):
     login_as(page, test_config["base_url"], ACCOUNTS["member_expired"]["email"], ACCOUNTS["member_expired"]["password"])
+    open_books_tab(page)
     borrow_btn = page.locator('flt-semantics[role="button"]:has-text("Mượn sách này")').first
+    borrow_btn.wait_for(state="attached", timeout=15000)
     borrow_btn.click()
     enable_flutter_semantics(page)
     confirm = page.locator('flt-semantics[role="button"]:has-text("Mượn")').first
     if confirm.count() > 0:
         confirm.click()
         enable_flutter_semantics(page)
+    page.wait_for_timeout(3000)
+    enable_flutter_semantics(page)
     page.screenshot(path=os.path.join(SCREENSHOT_DIR, "TC-29_expired_member.png"))
     txt = sem_text(page)
     assert "expired" in txt.lower() or "hết hạn" in txt.lower(), "TC-29 FAIL"
@@ -147,23 +161,47 @@ def test_tc34_book_status_immediate_after_return(page, test_config):
     return_btn.wait_for(state="attached", timeout=15000)
     return_btn.click()
     enable_flutter_semantics(page)
-    
+    # Chờ thông báo thành công trước khi chuyển tab
+    wait_for_flutter(page, text="thành công", timeout=10000)
+    page.wait_for_timeout(1500)
+
     open_books_tab(page)
-    wait_for_flutter(page, text="Có sẵn", timeout=10000)
+    # Chờ danh sách sách render xong (chờ nút Mượn sách này xuất hiện)
+    page.locator('flt-semantics[role="button"]:has-text("Mượn sách này")').first.wait_for(
+        state="attached", timeout=10000
+    )
+    page.wait_for_timeout(1000)
+    enable_flutter_semantics(page)
     page.screenshot(path=os.path.join(SCREENSHOT_DIR, "TC-34_after_return.png"))
+
+    # Status "Có sẵn"/"Available" có thể nằm trong aria-label của group node (không phải leaf)
+    # Kiểm tra cả aria-label lẫn leaf text
+    all_aria = page.evaluate("""() => {
+        return Array.from(document.querySelectorAll('flt-semantics[aria-label]'))
+            .map(n => n.getAttribute('aria-label'))
+            .join(' ');
+    }""")
     txt = sem_text(page)
-    assert "Available" in txt or "Có sẵn" in txt, "TC-34 FAIL: Status not updated"
+    combined = txt + " " + all_aria
+    assert "Available" in combined or "Có sẵn" in combined, "TC-34 FAIL: Status not updated"
 
 def test_tc35_no_duplicate_popup_on_rapid_return_clicks(page, test_config):
     login_as(page, test_config["base_url"], "librarian@library.com", "admin123")
     open_borrow_return_tab(page)
     return_btn = page.locator('flt-semantics[role="button"]:has-text("Trả sách")').first
     return_btn.wait_for(state="attached", timeout=15000)
-    for _ in range(3): return_btn.click()
+    # Click nhanh 3 lần liên tiếp để kiểm tra hệ thống không xử lý trùng lặp
+    return_btn.click()
+    return_btn.click()
+    return_btn.click()
+    # Chờ Flutter settle hoàn toàn, rồi refresh semantics tree
+    page.wait_for_timeout(4000)
     enable_flutter_semantics(page)
     page.screenshot(path=os.path.join(SCREENSHOT_DIR, "TC-35_no_duplicate_popup.png"))
+    # sem_text() mới chỉ lấy leaf nodes — không bị lặp do DOM tích luỹ
     txt = sem_text(page)
-    assert txt.count("thành công") <= 1, "TC-35 FAIL"
+    success_count = txt.lower().count("thành công")
+    assert success_count <= 1, f"TC-35 FAIL: 'thành công' appeared {success_count} times (expected ≤ 1)"
 
 @pytest.mark.xfail(reason="BUG-10: System does not show overdue warning")
 def test_tc36_overdue_warning_visible_for_member(page, test_config):

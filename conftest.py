@@ -113,8 +113,22 @@ def flutter_click_button(page, text):
 
 
 def sem_text(page):
-    """Return all visible semantics text as a single string."""
-    return " ".join(page.locator("flt-semantics").all_text_contents())
+    """Return visible semantics text from the current Flutter frame only.
+
+    Flutter CanvasKit keeps stale flt-semantics nodes in the DOM across
+    re-renders.  Collecting *all* of them via all_text_contents() causes
+    duplicated / stale text.  Instead we query only the deepest leaf nodes
+    (those with no flt-semantics children) so we get exactly what is
+    currently visible on screen.
+    """
+    return page.evaluate("""() => {
+        const nodes = Array.from(document.querySelectorAll('flt-semantics'));
+        const leaves = nodes.filter(n => !n.querySelector('flt-semantics'));
+        const texts = leaves
+            .map(n => (n.getAttribute('aria-label') || n.textContent || '').trim())
+            .filter(t => t.length > 0);
+        return texts.join(' ');
+    }""")
 
 
 # ---------------------------------------------------------------------------

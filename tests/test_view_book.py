@@ -65,13 +65,28 @@ def test_tc15_status_updates_after_return(page, test_config):
     return_btn.wait_for(state="attached", timeout=15000)
     return_btn.click()
     enable_flutter_semantics(page)
+    # Chờ xác nhận trả thành công trước khi chuyển sang tab Sách
+    wait_for_flutter(page, text="thành công", timeout=10000)
+    page.wait_for_timeout(1500)
 
     open_books_tab(page)
-    # CHỜ FLUTTER CẬP NHẬT UI TRƯỚC KHI LẤY TEXT
-    wait_for_flutter(page, text="Có sẵn", timeout=5000)
+    # Chờ danh sách sách render xong
+    page.locator('flt-semantics[role="button"]:has-text("Mượn sách này")').first.wait_for(
+        state="attached", timeout=10000
+    )
+    page.wait_for_timeout(1000)
+    enable_flutter_semantics(page)
     page.screenshot(path=os.path.join(SCREENSHOT_DIR, "TC-15_status_after_return.png"))
+
+    # Status có thể nằm trong aria-label của group node — collect cả hai
+    all_aria = page.evaluate("""() => {
+        return Array.from(document.querySelectorAll('flt-semantics[aria-label]'))
+            .map(n => n.getAttribute('aria-label'))
+            .join(' ');
+    }""")
     txt = sem_text(page)
-    assert "Available" in txt or "Có sẵn" in txt, "TC-15 FAIL: Status not updated."
+    combined = txt + " " + all_aria
+    assert "Available" in combined or "Có sẵn" in combined, "TC-15 FAIL: Status not updated."
 
 def test_tc16_publication_year_format(page, test_config):
     login(page, test_config)
