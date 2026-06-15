@@ -15,19 +15,19 @@ Sử dụng **Playwright + Python** để kiểm thử hệ thống Mượn sác
 
 > **⚠️ Sinh viên: Điền thông tin nhóm vào bảng dưới đây trước khi nộp bài.**
 
-|              | Thông tin                    |
-| ------------ | ---------------------------- |
-| **Tên nhóm** | `<!-- VD: Nhóm 1 -->`        |
-| **Lớp**      | `<!-- VD: SE001.P11 -->`     |
-| **Học kỳ**   | `<!-- VD: HK2 2025-2026 -->` |
+| | Thông tin |
+|---|---|
+| **Tên nhóm** | `STQA Group 10` |
+| **Lớp** | `252ICT2012.L1` |
+| **Học kỳ** | `HK2 2025-2026` |
 
-| #   | MSSV | Họ và tên | Vai trò     |
-| --- | ---- | --------- | ----------- |
-| 1   |      |           | Nhóm trưởng |
-| 2   |      |           | Thành viên  |
-| 3   |      |           | Thành viên  |
-| 4   |      |           | Thành viên  |
-
+| # | MSSV | Họ và tên | Vai trò |
+|---|------|-----------|---------|
+| 1 | 23BA14103 | Đặng Thế Hiệp | Nhóm trưởng | 
+| 2 | 23BA14122 | Nguyễn Văn Hoàng | Thành viên | 
+| 3 | 23BA14084 | Lê Đắc Duy | Thành viên |
+| 4 | 23BA14069 | Nguyễn Duy Dũng  | Thành viên |
+| 4 | 23BA14102 | Ngô Chấn Hiệp  | Thành viên |
 ---
 
 ## 📖 Trước khi bắt đầu — Bối cảnh / Before You Start — Context
@@ -88,7 +88,8 @@ stqa-library-automation-starter/
     ├── test_login.py           # TC-01 (example / mẫu) + TC-02, TC-03 (TODO)
     ├── test_search.py          # TC-04 ~ TC-07 (TODO)
     ├── test_borrow_return.py   # TC-08 ~ TC-10 (TODO)
-    └── test_general.py         # TC-11 ~ TC-12 (TODO)
+    ├── test_general.py         # TC-11 ~ TC-12 (TODO)
+    └── test_admin_features.py  # REQ-06 ~ REQ-08 (additional coverage)
 ```
 
 ---
@@ -201,6 +202,8 @@ CI sẽ thực hiện:
 | TC-12 | Chuyển ngôn ngữ sang EN (*Switch language*)          | `test_general.py`       | 🔴 TODO     |
 
 **Yêu cầu:** Hoàn thành tất cả 11 test case còn lại (TC-02 → TC-12).
+
+> Ghi chú: Repo này cũng có thêm test mở rộng cho REQ-06 → REQ-08 trong `tests/test_admin_features.py` để bao phủ các chức năng quản trị và tra cứu của SRS.
 
 ---
 
